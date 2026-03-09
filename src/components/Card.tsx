@@ -42,21 +42,45 @@ const Card = forwardRef<
         onWheel={(e) => dragHandlers.onWheel(e, containerRef)}
       >
         {state.imgSrc && (
-          <img
-            src={state.imgSrc}
-            alt=""
-            draggable={false}
-            style={{
-              position: 'absolute',
-              transformOrigin: '0 0',
-              transform: `translate(${state.imgX}px, ${state.imgY}px) scale(${state.imgScale})`,
-              width: state.imgNatW,
-              height: state.imgNatH,
-              maxWidth: 'none',
-              maxHeight: 'none',
-              pointerEvents: 'none',
-            }}
-          />
+          <>
+            <img
+              src={state.imgSrc}
+              alt=""
+              draggable={false}
+              style={{
+                position: 'absolute',
+                transformOrigin: '0 0',
+                transform: `translate(${state.imgX}px, ${state.imgY}px) scale(${state.imgScale})`,
+                width: state.imgNatW,
+                height: state.imgNatH,
+                maxWidth: 'none',
+                maxHeight: 'none',
+                pointerEvents: 'none',
+              }}
+            />
+
+            {/* Radial blur overlay */}
+            {state.blurAmount > 0 && (
+              <img
+                src={state.imgSrc}
+                alt=""
+                draggable={false}
+                style={{
+                  position: 'absolute',
+                  transformOrigin: '0 0',
+                  transform: `translate(${state.imgX}px, ${state.imgY}px) scale(${state.imgScale})`,
+                  width: state.imgNatW,
+                  height: state.imgNatH,
+                  maxWidth: 'none',
+                  maxHeight: 'none',
+                  pointerEvents: 'none',
+                  filter: `blur(${state.blurAmount}px)`,
+                  maskImage: 'radial-gradient(circle at center, transparent 25%, black 70%)',
+                  WebkitMaskImage: 'radial-gradient(circle at center, transparent 25%, black 70%)',
+                }}
+              />
+            )}
+          </>
         )}
 
         {!state.imgSrc && (

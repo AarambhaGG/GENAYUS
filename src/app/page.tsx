@@ -1,65 +1,180 @@
-import Image from "next/image";
+'use client'
+
+import { useState, useRef, useCallback } from 'react'
+import { toPng } from 'html-to-image'
+import { CardState, SongInfo, defaultState } from '@/types'
+import { useDragZoom } from '@/hooks/useDragZoom'
+import SearchBar from '@/components/SearchBar'
+import Sidebar from '@/components/Sidebar'
+import Card from '@/components/Card'
+import LyricsPanel from '@/components/LyricsPanel'
+import ThemeToggle from '@/components/ThemeToggle'
 
 export default function Home() {
+  const [state, setState] = useState<CardState>({ ...defaultState })
+  const [selectedSong, setSelectedSong] = useState<SongInfo | null>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const dragZoom = useDragZoom(
+    useCallback((x: number, y: number, scale: number) => {
+      setState((prev) => ({ ...prev, imgX: x, imgY: y, imgScale: scale }))
+    }, [])
+  )
+
+  const patch = useCallback(
+    (p: Partial<CardState>) => {
+      setState((prev) => {
+        const next = { ...prev, ...p }
+
+        // When a new image is uploaded, auto-fit it to cover the card
+        if (p.imgSrc && p.imgNatW && p.imgNatH) {
+          const cardW =
+            prev.ratio === 'sq' ? 480 : prev.ratio === 'story' ? 320 : 600
+          const cardH =
+            prev.ratio === 'sq' ? 430 : prev.ratio === 'story' ? 518 : 288
+          const scale = Math.max(cardW / p.imgNatW, cardH / p.imgNatH)
+          const scaledW = p.imgNatW * scale
+          const scaledH = p.imgNatH * scale
+          next.imgScale = scale
+          next.imgX = (cardW - scaledW) / 2
+          next.imgY = (cardH - scaledH) / 2
+          dragZoom.reset(next.imgX, next.imgY, next.imgScale)
+        }
+
+        // Re-fit on ratio change when image exists
+        if (p.ratio && prev.imgSrc && prev.imgNatW > 0) {
+          const cardW =
+            p.ratio === 'sq' ? 480 : p.ratio === 'story' ? 320 : 600
+          const cardH =
+            p.ratio === 'sq' ? 430 : p.ratio === 'story' ? 518 : 288
+          const scale = Math.max(
+            cardW / prev.imgNatW,
+            cardH / prev.imgNatH
+          )
+          const scaledW = prev.imgNatW * scale
+          const scaledH = prev.imgNatH * scale
+          next.imgScale = scale
+          next.imgX = (cardW - scaledW) / 2
+          next.imgY = (cardH - scaledH) / 2
+          dragZoom.reset(next.imgX, next.imgY, next.imgScale)
+        }
+
+        return next
+      })
+    },
+    [dragZoom]
+  )
+
+  const handleImageUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = () => {
+        const img = new window.Image()
+        img.onload = () => {
+          patch({
+            imgSrc: reader.result as string,
+            imgNatW: img.naturalWidth,
+            imgNatH: img.naturalHeight,
+            imgX: 0,
+            imgY: 0,
+            imgScale: 1,
+          })
+        }
+        img.src = reader.result as string
+      }
+      reader.readAsDataURL(file)
+    },
+    [patch]
+  )
+
+  const triggerUpload = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
+  const download = useCallback(async () => {
+    if (!cardRef.current) return
+    try {
+      const dataUrl = await toPng(cardRef.current, {
+        pixelRatio: 3,
+        cacheBust: true,
+      })
+      const link = document.createElement('a')
+      link.download = 'genayus-card.png'
+      link.href = dataUrl
+      link.click()
+    } catch (err) {
+      console.error('Export failed:', err)
+    }
+  }, [])
+
+  const handleSearchSelect = useCallback(
+    (song: SongInfo) => {
+      setSelectedSong(song)
+      patch({ artist: song.artist, song: song.title })
+    },
+    [patch]
+  )
+
+  const handleLyricLineClick = useCallback(
+    (text: string) => {
+      setState((prev) => ({
+        ...prev,
+        lines: [
+          ...prev.lines,
+          { id: Date.now().toString(), text },
+        ],
+      }))
+    },
+    []
+  )
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="h-screen flex flex-col" style={{ background: 'var(--bg)' }}>
+      {/* SHARED FILE INPUT */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageUpload}
+        className="hidden"
+      />
+
+      {/* HEADER */}
+      <header className="h-[48px] flex-shrink-0 flex items-center justify-between px-5 z-50" style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+        <span
+          className="text-[13px] tracking-[0.22em]"
+          style={{ fontWeight: 500, color: 'var(--fg)' }}
+        >
+          GENAYUS
+        </span>
+        <SearchBar onSelect={handleSearchSelect} />
+        <ThemeToggle />
+      </header>
+
+      {/* BODY */}
+      <div className="flex flex-1 min-h-0">
+        <Sidebar
+          state={state}
+          onChange={patch}
+          onDownload={download}
+          onUploadClick={triggerUpload}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+
+        {/* CANVAS AREA */}
+        <main className="flex-1 flex items-center justify-center overflow-auto" style={{ background: 'var(--bg-canvas)' }}>
+          <Card
+            ref={cardRef}
+            state={state}
+            dragHandlers={dragZoom}
+            onUploadClick={triggerUpload}
+          />
+        </main>
+
+        <LyricsPanel song={selectedSong} onLineClick={handleLyricLineClick} />
+      </div>
     </div>
-  );
+  )
 }
