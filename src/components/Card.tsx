@@ -21,8 +21,8 @@ interface DragHandlers {
 
 const Card = forwardRef<
   HTMLDivElement,
-  { state: CardState; dragHandlers: DragHandlers }
->(({ state, dragHandlers }, ref) => {
+  { state: CardState; dragHandlers: DragHandlers; onUploadClick?: () => void }
+>(({ state, dragHandlers, onUploadClick }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null)
 
   return (
@@ -60,10 +60,18 @@ const Card = forwardRef<
         )}
 
         {!state.imgSrc && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-[13px] text-[#555] select-none tracking-wide">
-              Upload a photo
-            </span>
+          <div
+            className="absolute inset-0 flex items-center justify-center cursor-pointer hover:bg-[#222] transition-colors"
+            onClick={onUploadClick}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="1.5">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+              </svg>
+              <span className="text-[13px] text-[#666] select-none tracking-wide">
+                Click to upload photo
+              </span>
+            </div>
           </div>
         )}
 
